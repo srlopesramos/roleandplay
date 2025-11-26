@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import DiceButton from './DiceButton'
 import RollDisplay from './RollDisplay'
 import HistoryLog from './HistoryLog'
+import GMControls from './GMControls'
 
 interface GameRoomProps {
     roomCode: string
@@ -22,21 +23,23 @@ export default function GameRoom({ roomCode, playerName, isGM, onLeave }: GameRo
     const [rolls, setRolls] = useState<Roll[]>([])
     const [latestRoll, setLatestRoll] = useState<Roll | null>(null)
     const [roomId, setRoomId] = useState<string | null>(null)
+    const [locked, setLocked] = useState(false)
 
     useEffect(() => {
-        const fetchRoomId = async () => {
+        const fetchRoomData = async () => {
             const { data } = await supabase
                 .from('rooms')
-                .select('id')
+                .select('id, locked')
                 .eq('code', roomCode)
                 .single()
 
             if (data) {
                 setRoomId(data.id)
+                setLocked(data.locked || false)
             }
         }
 
-        fetchRoomId()
+        fetchRoomData()
     }, [roomCode])
 
     useEffect(() => {
@@ -62,8 +65,8 @@ export default function GameRoom({ roomCode, playerName, isGM, onLeave }: GameRo
         fetchRolls()
 
         // Subscribe to new rolls
-        const channel = supabase
-            .channel(`room-${roomId}`)
+        const rollsChannel = supabase
+            .channel(`rolls-${roomId}`)
             .on(
                 'postgres_changes',
                 {
@@ -80,8 +83,27 @@ export default function GameRoom({ roomCode, playerName, isGM, onLeave }: GameRo
             )
             .subscribe()
 
+        // Subscribe to room lock status changes
+        const roomChannel = supabase
+            .channel(`room-${roomId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'rooms',
+                    filter: `id=eq.${roomId}`,
+                },
+                (payload) => {
+                    const updatedRoom = payload.new as { locked: boolean }
+                    setLocked(updatedRoom.locked)
+                }
+            )
+            .subscribe()
+
         return () => {
-            supabase.removeChannel(channel)
+            supabase.removeChannel(rollsChannel)
+            supabase.removeChannel(roomChannel)
         }
     }, [roomId])
 
@@ -98,8 +120,8 @@ export default function GameRoom({ roomCode, playerName, isGM, onLeave }: GameRo
     }
 
     return (
-        <div className="min-h-screen p-4">
-            <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen p-4 flex items-center justify-center">
+            <div className="max-w-5xl w-full mx-auto">
                 {/* Header */}
                 <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6 border border-white/20 mb-6">
                     <div className="flex items-center justify-between">
@@ -122,8 +144,14 @@ export default function GameRoom({ roomCode, playerName, isGM, onLeave }: GameRo
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Dice Roll Area */}
                     <div className="lg:col-span-2 space-y-6">
+                        {isGM && roomId && <GMControls roomId={roomId} locked={locked} />}
                         <RollDisplay latestRoll={latestRoll} />
-                        <DiceButton onRoll={handleRoll} disabled={false} />
+                        <DiceButton
+                            onRoll={handleRoll}
+                            disabled={locked && !isGM}
+                            locked={locked}
+                            isGM={isGM}
+                        />
                     </div>
 
                     {/* History Sidebar */}
