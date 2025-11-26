@@ -4,8 +4,8 @@ Este documento serve como guia passo-a-passo para o desenvolvimento do sistema d
 
 ## 🏁 Fase 1: Configuração Inicial (Setup)
 O alicerce do projeto.
-- [ ] **Criar projeto React + Vite** (Garante performance e setup rápido).
-- [ ] **Instalar e configurar Tailwind CSS** (Para estilização rápida e bonita).
+- [x] **Criar projeto React + Vite** (Garante performance e setup rápido).
+- [x] **Instalar e configurar Tailwind CSS** (Para estilização rápida e bonita).
 - [ ] **Criar projeto no Supabase** (Nosso Backend e Banco de Dados).
 - [ ] **Configurar variáveis de ambiente** (Conectar o React ao Supabase).
 
